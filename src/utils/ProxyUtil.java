@@ -27,6 +27,10 @@ public class ProxyUtil {
 		public String getRight(){
 			return right;
 		}
+		
+		public String toString(){
+			return "Left: " + left + ", right: " + right;
+		}
 	}
 	
 	public static class IntPair{
