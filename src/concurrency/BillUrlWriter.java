@@ -22,8 +22,7 @@ public class BillUrlWriter implements Runnable {
 	public void run() {
 		try {
 			while (true) { 
-				consume(urlQueue.take()); 
-				
+				consume(urlQueue.take()); 			
 			}
 		} catch (InterruptedException ex) {
 			System.out.println("BillUrlWriter produced exception: " + ex);

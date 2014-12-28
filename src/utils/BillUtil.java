@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 
 import utils.ProxyUtil.Pair;
+import concurrency.BillListWriter;
 import concurrency.BillUrlWriter;
 
 public class BillUtil {
@@ -22,23 +23,13 @@ public class BillUtil {
 
 	public static int RATE_LIMIT = 20000;
 
-	public static String PROXY = "192.161.166.99";
-
-	public static String PORT = "8800";
-
 	public static String PROXY_SITE = "http://www.us-proxy.org/";
-
-	public static boolean newProxy = false;
-
-	public static boolean first = true;
-
+	
 	public static String filepath = "C:\\Users\\wspride\\Desktop\\912014\\references\\Referencer\\bills\\";
 
 	public static ArrayList<Pair> proxyPairs;
 
 	public static final int MAX_PROXY_RECURSION = 5;
-
-	public static final Object TARGET_URL_LOCK = new Object();
 
 	public static void main(String [] args){
 
@@ -59,25 +50,16 @@ public class BillUtil {
 			e.printStackTrace();
 		}
 		
-		System.out.println("added pairs");
-		
-		/*
-		for(Pair billRange: billNumberRanges){
-			try {
-				System.out.println("Pair: " + billRange.left +":"+ billRange.right);
-				targetURLs.addAll(pullBillXML(111, "hr", billRange.left, billRange.right));
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		*/
-		
-		ArrayBlockingQueue<String> urlQueue = new ArrayBlockingQueue<String>(8000, false, targetURLs);
+		ArrayBlockingQueue<String> billUrlQueue = new ArrayBlockingQueue<String>(8000, false, targetURLs);
 		ArrayBlockingQueue<Pair> proxyQueue = new ArrayBlockingQueue<Pair>(8000, false, proxyPairs);
+		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, billNumberRanges);
 		
-		BillUrlWriter writer1 = new BillUrlWriter(urlQueue, proxyQueue);
-		BillUrlWriter writer2 = new BillUrlWriter(urlQueue, proxyQueue);
+		BillListWriter writer0 = new BillListWriter(proxyQueue, rangeQueue, billUrlQueue, 111,"hr");
 		
+		BillUrlWriter writer1 = new BillUrlWriter(billUrlQueue, proxyQueue);
+		BillUrlWriter writer2 = new BillUrlWriter(billUrlQueue, proxyQueue);
+		
+		new Thread(writer0).start();
 		new Thread(writer1).start();
 		new Thread(writer2).start();
 		
@@ -123,7 +105,7 @@ public class BillUtil {
 
 		String url = getBillList(congress, code);
 
-		BufferedReader in = getProxyInputStream(url);
+		BufferedReader in = getProxyInputStream(url, proxyPairs.remove(0));
 		String inputLine = "";
 
 		try {
@@ -161,23 +143,17 @@ public class BillUtil {
 	
 	public static BufferedReader getProxyInputStream(String url, Pair pair){
 		
+		return getProxyInputStream(url, 0, pair);
+		
+	}
+	
+	public static BufferedReader getProxyInputStream(String url, int count, Pair pair){
+		
 		Proxy proxy = new Proxy(Proxy.Type.HTTP, 
 				new InetSocketAddress(pair.getLeft(),Integer.valueOf(pair.getRight())));
 		
 		System.out.println("creating proxy with addr: " + pair.getLeft() + " port: " + pair.getRight());
 		
-		return getProxyInputStream(url, 0, proxy);
-	}
-
-	public static BufferedReader getProxyInputStream(String url){
-		return getProxyInputStream(url, 0);
-	}
-
-	public static BufferedReader getProxyInputStream(String url, int count){
-		
-		Proxy proxy = new Proxy(Proxy.Type.HTTP, 
-				new InetSocketAddress(PROXY,Integer.valueOf(PORT)));
-
 		return getProxyInputStream(url, count, proxy);
 	}
 	
@@ -202,32 +178,29 @@ public class BillUtil {
 			ioe.printStackTrace();
 
 			Pair mPair = proxyPairs.get(0);
-			proxyPairs.remove(0);
+			Pair mProxy = proxyPairs.remove(0);
 
-			PROXY = mPair.getLeft();
-			PORT = mPair.getRight();
-
-			newProxy = true;
-
-			System.out.println("Using proxy and port: " + PROXY + ", " + PORT);
-
-			return getProxyInputStream(url, count +1);
+			return getProxyInputStream(url, count +1, mPair);
 		}
 	}
 
 	public static ArrayList<String> pullBillXML(int congress, String code, String startRange, String endRange) throws Exception{
 
-		BufferedReader in = null;
+		String mUrl = getBillPage(congress, code, startRange, endRange);
+		BufferedReader in = getProxyInputStream(mUrl, proxyPairs.remove(0));
+		
+		return pullBillXML(congress, code, startRange, endRange, in);
+		
+	}
+	
+	public static ArrayList<String> pullBillXML(int congress, String code, String startRange, String endRange, BufferedReader in) throws Exception{
+
 		ArrayList<String> urlList = new ArrayList<String>();
 
 		try{
 			System.setProperty("http.agent", "");
-			System.setProperty("http.proxyHost", PROXY);
-			System.setProperty("http.proxyPort", PORT);
 
 			String mUrl = getBillPage(congress, code, startRange, endRange);
-
-			in = getProxyInputStream(mUrl);
 
 			String inputLine;
 
@@ -278,6 +251,7 @@ public class BillUtil {
 				}
 				catch(IOException e){
 					e.printStackTrace();
+					writer.close();
 					return false;
 				}
 			}
