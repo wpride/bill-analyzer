@@ -7,16 +7,18 @@ import java.util.concurrent.BlockingQueue;
 import utils.BillUtil;
 import utils.ProxyUtil.Pair;
 
-public class BillUrlWriter implements Runnable {
+public class UrlToFileWorker implements Runnable {
 
 	private final BlockingQueue<String> urlQueue;
 	private final BlockingQueue<Pair> proxyQueue;
 	private Pair mPair;
+	private String writePath;
 
-	public BillUrlWriter(BlockingQueue<String> urlQ, BlockingQueue<Pair> proxyQ) { 
+	public UrlToFileWorker(BlockingQueue<String> urlQ, BlockingQueue<Pair> proxyQ, String writePath) { 
 		urlQueue = urlQ;
 		proxyQueue = proxyQ;
 		mPair = proxyQ.remove();
+		this.writePath = writePath;
 	}
 
 	public void run() {
@@ -33,7 +35,7 @@ public class BillUrlWriter implements Runnable {
 	void consume(String url) { 
 		try {
 			System.out.println("BillUrlWriter trying to write url: " + url + " with proxy addr: " + mPair.getLeft() + " port: " + mPair.getRight());
-			boolean written = BillUtil.writeBillFile(url, BillUtil.getProxyInputStream(url, mPair));
+			boolean written = BillUtil.writeFile(url, BillUtil.getProxyInputStream(url, mPair), writePath);
 			if(written){
 				Thread.sleep(BillUtil.RATE_LIMIT);
 			}
