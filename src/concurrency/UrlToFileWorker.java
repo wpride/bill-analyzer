@@ -1,7 +1,6 @@
 package concurrency;
 
 import java.io.IOException;
-import java.net.Proxy;
 import java.util.concurrent.BlockingQueue;
 
 import utils.BillUtil;
