@@ -33,6 +33,9 @@ public class BillUtil {
 	public static String xml_filepath = "C:\\Users\\wspride\\Desktop\\912014\\references\\Referencer\\bills\\xml\\";
 
 	public static final int MAX_PROXY_RECURSION = 5;
+	
+	public static final int NUMBER_MORE_TO_XML_WORKERS = 20;
+	public static final int NUMBER_XML_TO_FILE_WORKERS = 20;
 
 	public static void main(String[] args){
 
@@ -68,29 +71,49 @@ public class BillUtil {
 	 */
 
 	public static void generateXMLFiles(ArrayList<Pair> proxyPairs){
+		
+		int congCode = 111;
+		String billCode = "hr";
 
-		ArrayList<Pair> billNumberRanges = getValidRanges(111,"hr", proxyPairs);
+		ArrayList<Pair> billNumberRanges = getValidRanges(congCode,billCode, proxyPairs);
+		
+		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false);
+		
+		for(Pair p: billNumberRanges){
+			
+			String start = p.getLeft();
+			String end = p.getRight();
+			
+			String startString = congCode + billCode + start;
+			String endString = congCode + billCode + end;
+
+			if(pathContainsFile(xml_filepath, startString) && pathContainsFile(xml_filepath, endString)){
+				System.out.println("Match! Removed range: " + p.toString());
+			} else{
+				rangeQueue.add(p);
+			}
+		}
 
 		ArrayBlockingQueue<Pair> proxyQueue = new ArrayBlockingQueue<Pair>(8000, false, proxyPairs);
-		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, billNumberRanges);
+		//ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, billNumberRanges);
 		ArrayBlockingQueue<String> urlMoreQueue = new ArrayBlockingQueue<String> (8000, false);
 		ArrayBlockingQueue<String> xmlUrlQueue = new ArrayBlockingQueue<String>(8000, false);
 
 		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, urlMoreQueue, 111,"hr", "More<", true);
-		MoreToXmlWorker writer1 = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
-		MoreToXmlWorker writer10 = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
-		MoreToXmlWorker writer11 = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
-		UrlToFileWorker writer2 = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
-		UrlToFileWorker writer20 = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
-		UrlToFileWorker writer21 = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
-
 		new Thread(writer0).start();
-		new Thread(writer1).start();
-		new Thread(writer10).start();
-		new Thread(writer11).start();
-		new Thread(writer2).start();
-		new Thread(writer20).start();
-		new Thread(writer21).start();
+		
+		MoreToXmlWorker[] moreToXmlWorkers = new MoreToXmlWorker[NUMBER_MORE_TO_XML_WORKERS];
+		UrlToFileWorker[] urlToFileWorkers = new UrlToFileWorker[NUMBER_XML_TO_FILE_WORKERS];
+		
+		for(int i =0; i < NUMBER_MORE_TO_XML_WORKERS; i++){
+			moreToXmlWorkers[i] = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
+			new Thread(moreToXmlWorkers[i]).start();
+		}
+		
+		for(int i =0; i < NUMBER_XML_TO_FILE_WORKERS; i++){
+			urlToFileWorkers[i] = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
+			new Thread(urlToFileWorkers[i]).start();
+		}
 
 	}
 
@@ -189,6 +212,34 @@ public class BillUtil {
 
 		return ret;
 
+	}
+
+	public static boolean pathContainsFile(String path, String code){
+		
+		String[] filenames = filenamesInFolder(path);
+		for(String s:filenames){
+			if(s.contains(code)){
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	public static String[] filenamesInFolder(String path){
+		File folder = new File(path);
+		File[] listOfFiles = folder.listFiles();
+		String[] listOfFileNames = new String[listOfFiles.length];
+
+		for (int i = 0; i < listOfFiles.length; i++) {
+			if (listOfFiles[i].isFile()) {
+				listOfFileNames[i] = listOfFiles[i].getName();
+			} else if (listOfFiles[i].isDirectory()) {
+				System.out.println("BAD folder in path");
+			}
+		}
+		
+		return listOfFileNames;
 	}
 
 	public static BufferedReader getProxyInputStream(String url, Pair pair) throws IOException{

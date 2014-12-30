@@ -49,8 +49,11 @@ public class ListToUrlWorker implements Runnable {
 			ArrayList<String> returnedURLs = BillUtil.getKeyRef(url, BillUtil.getProxyInputStream(url, mProxy), key, relative);
 			
 			System.out.println("ListToUrlWorker added " + returnedURLs.size() + " URLs with key: " + key);
-			
-			urlQueue.addAll(returnedURLs);
+			try{
+				urlQueue.addAll(returnedURLs);
+			} catch (IllegalStateException e){
+				// filled up, fail quietly
+			}
 			
 			if(true){
 				Thread.sleep(BillUtil.RATE_LIMIT);
@@ -68,7 +71,10 @@ public class ListToUrlWorker implements Runnable {
 		} 
 		catch (Exception e) {
 			System.out.println("ListToUrlWorker produced consumption produced exception: " + e);
-			e.printStackTrace();
+			try {
+				Thread.sleep(1000000);
+			} catch (InterruptedException e1) {
+			}
 			rangeQueue.add(range);
 		}
 		

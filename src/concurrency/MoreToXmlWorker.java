@@ -66,6 +66,12 @@ public class MoreToXmlWorker implements Runnable {
 			}
 		} catch (ParseException pe){
 			System.out.println("Couldn't find XML! in URL : " + url);
+			try {
+				mPair = proxyQueue.take();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 		catch (Exception e) {
 			System.out.println("MoreToXMLWorker produced consumption produced exception: " + e);
