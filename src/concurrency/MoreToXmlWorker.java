@@ -1,6 +1,7 @@
 package concurrency;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.concurrent.BlockingQueue;
 
 import utils.BillUtil;
@@ -15,7 +16,7 @@ public class MoreToXmlWorker implements Runnable {
 
 	
 	
-	public MoreToXmlWorker(BlockingQueue<String> inputUrlQ, BlockingQueue<String> outputUrlQ, BlockingQueue<Pair> proxyQ) { 
+	public MoreToXmlWorker(BlockingQueue<Pair> proxyQ, BlockingQueue<String> inputUrlQ, BlockingQueue<String> outputUrlQ) { 
 		inputUrlQueue = inputUrlQ;
 		outputUrlQueue = outputUrlQ;
 		proxyQueue = proxyQ;
@@ -28,7 +29,7 @@ public class MoreToXmlWorker implements Runnable {
 				consume(inputUrlQueue.take()); 			
 			}
 		} catch (InterruptedException ex) {
-			System.out.println("BillUrlWriter produced exception: " + ex);
+			System.out.println("MoreToXMLWorker produced exception: " + ex);
 			ex.printStackTrace();
 		}
 	}
@@ -42,19 +43,32 @@ public class MoreToXmlWorker implements Runnable {
 	void consume(String url) { 
 		
 		try {
+			
+			System.out.println("MoreToXML using URL: " + url);
+			
 			String ret = BillUtil.getXmlUrl(url, BillUtil.getProxyInputStream(url, mPair));
+			
+			System.out.println("MoreToXML added " + ret + " URLs with url: " + url);
+			
 			outputUrlQueue.add(ret);
 			if(true){
 				Thread.sleep(BillUtil.RATE_LIMIT);
 			}
 		} 
 		catch(IOException ioe){
-			System.out.println("BillUrlWriter consumption produced IOException: " + ioe);
+			System.out.println("MoreToXMLWorker consumption produced IOException: " + ioe);
 			inputUrlQueue.add(url);
-			mPair = proxyQueue.remove();
-		} 
+			try {
+				mPair = proxyQueue.take();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		} catch (ParseException pe){
+			System.out.println("Couldn't find XML! in URL : " + url);
+		}
 		catch (Exception e) {
-			System.out.println("BillUrlWriter produced consumption produced exception: " + e);
+			System.out.println("MoreToXMLWorker produced consumption produced exception: " + e);
 			e.printStackTrace();
 			inputUrlQueue.add(url);
 		}

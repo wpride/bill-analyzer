@@ -49,14 +49,32 @@ public class Article implements Serializable{
 		return isThisArticle(art.getTitle());
 	}
 	
-	public void addCiter(Article mArticle){
+	private boolean citedByArticle(Article mArticle){
+		for(int i=0; i<citers.size();i++){
+			if(mArticle.isThisArticle(citers.get(i))){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	private void addCiter(Article mArticle){
 		citersSet = true;
+		if(citedByArticle(mArticle)){
+			return;
+		}
 		citers.add(mArticle);
+	}
+	
+	private void addAll(ArrayList<Article> mArticles){
+		for(int i=0;i<mArticles.size();i++){
+			addCiter(mArticles.get(i));
+		}
 	}
 	
 	public void addCiters(ArrayList<Article> mArticles){
 		citersSet = true;
-		citers.addAll(mArticles);
+		this.addAll(mArticles);
 	}
 	
 	public ArrayList<Article> getCiters(){
@@ -65,6 +83,13 @@ public class Article implements Serializable{
 	
 	public boolean citersSet(){
 		return citersSet;
+	}
+	
+	public void setCitedSet(boolean s){
+		citersSet = s;
+		if(!s){
+			citers = new ArrayList<Article>();
+		}
 	}
 	
 	public boolean isThisArticle(String testTitle){

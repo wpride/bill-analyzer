@@ -14,7 +14,7 @@ public class UrlToFileWorker implements Runnable {
 	private Pair mPair;
 	private String writePath;
 
-	public UrlToFileWorker(BlockingQueue<String> urlQ, BlockingQueue<Pair> proxyQ, String writePath) { 
+	public UrlToFileWorker(BlockingQueue<Pair> proxyQ, BlockingQueue<String> urlQ, String writePath) { 
 		urlQueue = urlQ;
 		proxyQueue = proxyQ;
 		mPair = proxyQ.remove();
@@ -27,26 +27,32 @@ public class UrlToFileWorker implements Runnable {
 				consume(urlQueue.take()); 			
 			}
 		} catch (InterruptedException ex) {
-			System.out.println("BillUrlWriter produced exception: " + ex);
+			System.out.println("UrlToFileWorker produced exception: " + ex);
 			ex.printStackTrace();
 		}
 	}
 
 	void consume(String url) { 
 		try {
-			System.out.println("BillUrlWriter trying to write url: " + url + " with proxy addr: " + mPair.getLeft() + " port: " + mPair.getRight());
+			System.out.println("UrlToFileWorker trying to write url: " + url + " with proxy addr: " + mPair.getLeft() + " port: " + mPair.getRight());
 			boolean written = BillUtil.writeFile(url, BillUtil.getProxyInputStream(url, mPair), writePath);
 			if(written){
+				System.out.println("UrlToFileWorker added " + url + " to path " + writePath);
 				Thread.sleep(BillUtil.RATE_LIMIT);
 			}
 		} 
 		catch(IOException ioe){
-			System.out.println("BillUrlWriter consumption produced IOException: " + ioe);
+			System.out.println("UrlToFileWorker consumption produced IOException: " + ioe);
 			urlQueue.add(url);
-			mPair = proxyQueue.remove();
+			try {
+				mPair = proxyQueue.take();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		} 
 		catch (Exception e) {
-			System.out.println("BillUrlWriter produced consumption produced exception: " + e);
+			System.out.println("UrlToFileWorker produced consumption produced exception: " + e);
 			e.printStackTrace();
 			urlQueue.add(url);
 		}

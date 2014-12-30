@@ -7,9 +7,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.URL;
 import java.net.URLConnection;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -19,8 +21,6 @@ import concurrency.MoreToXmlWorker;
 import concurrency.UrlToFileWorker;
 
 public class BillUtil {
-
-	public static int lev_min = 5;
 
 	public static int RATE_LIMIT = 20000;
 
@@ -32,87 +32,68 @@ public class BillUtil {
 
 	public static String xml_filepath = "C:\\Users\\wspride\\Desktop\\912014\\references\\Referencer\\bills\\xml\\";
 
-	public static ArrayList<Pair> proxyPairs;
-
 	public static final int MAX_PROXY_RECURSION = 5;
 
 	public static void main(String[] args){
-		
+
 		System.setProperty("http.agent", "");
-		proxyPairs = ProxyUtil.getProxies(PROXY_SITE);
+		ArrayList<Pair> proxyPairs = ProxyUtil.getProxies(PROXY_SITE);
+
+		System.out.println("Proxy pairs size: " + proxyPairs.size());
 		
 		if(BillUtil.MODE.equals("xml")){
-			BillUtil.generateXMLFiles();
+			BillUtil.generateXMLFiles(proxyPairs);
 		} else{
-			BillUtil.generateHtmlFiles();
+			BillUtil.generateHtmlFiles(proxyPairs);
 		}
 	}
-	
-	public static void generateHtmlFiles(){
 
-		ArrayList<Pair> billNumberRanges = pullAllBillXML(111,"hr");
+	public static void generateHtmlFiles(ArrayList<Pair> proxyPairs){
 
-		ArrayList<String> targetURLs = new ArrayList<String>();
+		ArrayList<Pair> validBillRanges = getValidRanges(111,"hr", proxyPairs);
 
-		Pair first = billNumberRanges.get(0);
-
-		try {
-			String mUrl = BillUtil.getBillPage(111, "hr", first.left, first.right);
-			//targetURLs.addAll(pullBillXML(mUrl, BillUtil.getProxyInputStream(mUrl, proxyPairs.remove(0))));
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		ArrayBlockingQueue<String> billUrlQueue = new ArrayBlockingQueue<String>(8000, false, targetURLs);
 		ArrayBlockingQueue<Pair> proxyQueue = new ArrayBlockingQueue<Pair>(8000, false, proxyPairs);
-		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, billNumberRanges);
+		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, validBillRanges);
+		ArrayBlockingQueue<String> htmlUrlQueue = new ArrayBlockingQueue<String>(8000, false);
 
-		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, billUrlQueue, 111,"hr", "TEXT");
-
-		UrlToFileWorker writer1 = new UrlToFileWorker(billUrlQueue, proxyQueue, html_filepath);
+		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, htmlUrlQueue, 111,"hr", ">TEXT<", false);
+		UrlToFileWorker writer1 = new UrlToFileWorker(proxyQueue, htmlUrlQueue, html_filepath);
 
 		new Thread(writer0).start();
 		new Thread(writer1).start();
 	}
-	
+
 	/**
-	 *  Generate the XML files
+	 *  Generate the XML files	
 	 */
-	
-	public static void generateXMLFiles(){
 
-		ArrayList<Pair> billNumberRanges = pullAllBillXML(111,"hr");
+	public static void generateXMLFiles(ArrayList<Pair> proxyPairs){
 
-		ArrayList<String> targetURLs = new ArrayList<String>();
-
-		Pair first = billNumberRanges.get(0);
-
-		try {
-			String mUrl = BillUtil.getBillPage(111, "hr", first.left, first.right);
-			//targetURLs.addAll(pullBillXML(mUrl, BillUtil.getProxyInputStream(mUrl, proxyPairs.remove(0))));
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		ArrayList<Pair> billNumberRanges = getValidRanges(111,"hr", proxyPairs);
 
 		ArrayBlockingQueue<Pair> proxyQueue = new ArrayBlockingQueue<Pair>(8000, false, proxyPairs);
 		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, billNumberRanges);
-		ArrayBlockingQueue<String> billXmlUrlQueue = new ArrayBlockingQueue<String>(8000, false, targetURLs);
 		ArrayBlockingQueue<String> urlMoreQueue = new ArrayBlockingQueue<String> (8000, false);
+		ArrayBlockingQueue<String> xmlUrlQueue = new ArrayBlockingQueue<String>(8000, false);
 
-		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, urlMoreQueue, 111,"hr", "XML");
-		
-		MoreToXmlWorker writer1 = new MoreToXmlWorker(urlMoreQueue, billXmlUrlQueue, proxyQueue);
-
-		UrlToFileWorker writer2 = new UrlToFileWorker(billXmlUrlQueue, proxyQueue, xml_filepath);
+		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, urlMoreQueue, 111,"hr", "More<", true);
+		MoreToXmlWorker writer1 = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
+		MoreToXmlWorker writer10 = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
+		MoreToXmlWorker writer11 = new MoreToXmlWorker(proxyQueue, urlMoreQueue, xmlUrlQueue);
+		UrlToFileWorker writer2 = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
+		UrlToFileWorker writer20 = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
+		UrlToFileWorker writer21 = new UrlToFileWorker(proxyQueue, xmlUrlQueue, xml_filepath);
 
 		new Thread(writer0).start();
 		new Thread(writer1).start();
+		new Thread(writer10).start();
+		new Thread(writer11).start();
 		new Thread(writer2).start();
+		new Thread(writer20).start();
+		new Thread(writer21).start();
 
 	}
-	
+
 	/**
 	 * given a congress number, bill code, and range, return the URL to the expanded list of these bills
 	 * 
@@ -150,7 +131,7 @@ public class BillUtil {
 	 * @param billCode - bill code
 	 * @return
 	 */
-	
+
 	public static String getBillListUrl(int congress, String billCode){
 
 		String base = "http://www.gpo.gov/fdsys/browse/collection.action?collectionCode=BILLS" +
@@ -168,16 +149,16 @@ public class BillUtil {
 	 * @param congress the congress number (IE 111)
 	 * @param code the bill code (IE hr, sr, etc) 
 	 */
-	public static ArrayList<Pair> pullAllBillXML(int congress, String code){
-	
+	public static ArrayList<Pair> getValidRanges(int congress, String code, ArrayList<Pair> proxyPairs){
+
 		ArrayList<Pair> ret = new ArrayList<Pair>();
 
 		String url = getBillListUrl(congress, code);
 
-		BufferedReader in = getProxyInputStream(url, proxyPairs.remove(0));
-		String inputLine = "";
+		try{
+			BufferedReader in = getProxyInputStream(url, proxyPairs.remove(0));
 
-		try {
+			String inputLine = "";
 
 			while ((inputLine = in.readLine()) != null){
 				if(inputLine.contains("[") && inputLine.contains(";") && inputLine.contains("]")){
@@ -202,53 +183,43 @@ public class BillUtil {
 				}
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+			return getValidRanges(congress, code, proxyPairs);
 		}
 
 		return ret;
 
 	}
 
-	public static BufferedReader getProxyInputStream(String url, Pair pair){
+	public static BufferedReader getProxyInputStream(String url, Pair pair) throws IOException{
 
 		return getProxyInputStream(url, 0, pair);
 
 	}
 
-	public static BufferedReader getProxyInputStream(String url, int count, Pair pair){
+	public static BufferedReader getProxyInputStream(String url, int count, Pair pair) throws IOException{
 
 		Proxy proxy = new Proxy(Proxy.Type.HTTP, 
 				new InetSocketAddress(pair.getLeft(),Integer.valueOf(pair.getRight())));
 
 		return getProxyInputStream(url, count, proxy);
 	}
-	
-	public static BufferedReader getProxyInputStream(String url, int count, Proxy proxy){
-		
+
+	public static BufferedReader getProxyInputStream(String url, int count, Proxy proxy) throws IOException{
+
 		if(count >= BillUtil.MAX_PROXY_RECURSION){
 			return null;
 		}
 
-		try{
+		URL oracle = new URL(url);
 
-			URL oracle = new URL(url);
+		URLConnection yc = oracle.openConnection(proxy);
 
-			URLConnection yc = oracle.openConnection(proxy);
-
-			yc.addRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");
-			return new BufferedReader(new InputStreamReader(
-					yc.getInputStream()));
-
-		} catch(IOException ioe) {
-			System.out.println("Caught IOE: " + ioe);
-			ioe.printStackTrace();
-
-			Pair mProxy = proxyPairs.remove(0);
-
-			return getProxyInputStream(url, count +1, mProxy);
-		}
+		yc.addRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0");
+		return new BufferedReader(new InputStreamReader(
+				yc.getInputStream()));
 	}
+
 
 	/**
 	 * 
@@ -260,8 +231,8 @@ public class BillUtil {
 	 * @return
 	 * @throws Exception
 	 */
-	
-	public static ArrayList<String> getKeyRef(String url, BufferedReader in, String key) throws Exception{
+
+	public static ArrayList<String> getKeyRef(String url, BufferedReader in, String key, boolean relative) throws Exception{
 
 		ArrayList<String> urlList = new ArrayList<String>();
 
@@ -274,15 +245,24 @@ public class BillUtil {
 
 			while ((inputLine = in.readLine()) != null) {
 				if(inputLine.contains(key)){
-
+					
 					int startIndex = inputLine.indexOf("href=") + 6;
-					int endIndex = inputLine.indexOf("target=")-2;
-
-					String ref = inputLine.substring(startIndex, endIndex);
+					
+					String newString = inputLine.substring(startIndex);
+					
+					int endIndex = newString.indexOf('"');
+					
+					String ref = newString.substring(0, endIndex);
+					
+					if(relative){
+						ref = "http://www.gpo.gov/fdsys/" + ref;
+					}
 
 					ref = BillUtil.processReference(ref);
 
-					urlList.add(ref);
+					if(ref != null)	{
+						urlList.add(ref);
+					}
 				}
 			}
 		}
@@ -304,18 +284,10 @@ public class BillUtil {
 			ret = ret.replace(".htm",".xml");
 
 		}
+		
+		ret = ret.replace("amp;", "");
+		
 		return ret;
-	}
-
-	public static boolean doesBillExist(String code){
-		if(BillUtil.MODE.equals("xml")){
-			File f = new File(xml_filepath + code);
-			return f.exists();
-		} else if(BillUtil.MODE.equals("html")){
-			File f = new File(html_filepath + code);
-			return f.exists();
-		}
-		return false;
 	}
 
 	public static String getBillNameFromRef(String ref){	
@@ -330,24 +302,15 @@ public class BillUtil {
 		return "null";
 	}
 
-	public static String getFilePath(){
-		if(BillUtil.MODE.equals("xml")){
-			return xml_filepath;
-		} else if(BillUtil.MODE.equals("html")){
-			return html_filepath;
-		}
-		return "null";
-	}
-
 	public static boolean writeFile(String url, BufferedReader in, String writePath) throws Exception {
+
+		String path = writePath + getBillNameFromRef(url);
 		
-		File pathFile = new File(writePath);
+		File pathFile = new File(path);
 
 		if(!pathFile.exists()){
 
-			String path = writePath + getBillNameFromRef(url);
-
-			System.out.println("writing file for url: " + url + ".");
+			System.out.println("writing file for url: " + url + " and filepath: " + path);
 
 			BufferedWriter writer = new BufferedWriter(new FileWriter(path));
 
@@ -375,15 +338,21 @@ public class BillUtil {
 
 		String inputLine;
 		while ((inputLine = in.readLine()) != null){
-			if(inputLine.contains(">xml<")){
-				int startIndex = inputLine.indexOf("href=") + 6;
-				int endIndex = inputLine.indexOf("target=")-2;
-				String ret = inputLine.substring(startIndex, endIndex);
-				return ret;
+			if(inputLine.contains(">XML<")){
+				
+				int endIndex = inputLine.indexOf(".xml");
+				
+				String trimmed = inputLine.substring(0, endIndex + 4);
+				
+				int startIndex = trimmed.lastIndexOf("href=") + 6;
+				
+				trimmed = trimmed.substring(startIndex);
+				
+				return trimmed;
 			}
 		}
 		in.close();
-		return "null";
+		throw new ParseException("Couldn't find XML!", 0);
 
 	}
 

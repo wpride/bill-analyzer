@@ -116,7 +116,6 @@ public class ProxyUtil {
 				String sub1 = inputLine.substring(index1);
 				int index2 = sub1.indexOf("</td>");
 				String IPADDR = sub1.substring(0, index2);
-				System.out.println(IPADDR);
 				
 				int index3 = sub1.indexOf("<td>")+4;
 				String sub2 = sub1.substring(index3);
@@ -125,8 +124,6 @@ public class ProxyUtil {
 				
 				Pair mPair = new Pair(IPADDR, PORT);
 				mPairs.add(mPair);
-				
-				System.out.println(PORT);
 				
 			}
 		}
