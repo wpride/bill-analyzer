@@ -26,6 +26,8 @@ public class BillUtil {
 	public static String PROXY_SITE = "http://www.us-proxy.org/";
 
 	public static String MODE = "xml";
+	
+	public static String BILL_CODE = "s";
 
 	public static String html_filepath = "C:\\Users\\wspride\\Desktop\\912014\\references\\Referencer\\bills\\html\\";
 
@@ -52,13 +54,13 @@ public class BillUtil {
 
 	public static void generateHtmlFiles(ArrayList<Pair> proxyPairs){
 
-		ArrayList<Pair> validBillRanges = getValidRanges(111,"hr", proxyPairs);
+		ArrayList<Pair> validBillRanges = getValidRanges(111,BillUtil.BILL_CODE, proxyPairs);
 
 		ArrayBlockingQueue<Pair> proxyQueue = new ArrayBlockingQueue<Pair>(8000, false, proxyPairs);
 		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false, validBillRanges);
 		ArrayBlockingQueue<String> htmlUrlQueue = new ArrayBlockingQueue<String>(8000, false);
 
-		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, htmlUrlQueue, 111,"hr", ">TEXT<", false);
+		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, htmlUrlQueue, 111,BillUtil.BILL_CODE, ">TEXT<", false);
 		UrlToFileWorker writer1 = new UrlToFileWorker(proxyQueue, htmlUrlQueue, html_filepath);
 
 		new Thread(writer0).start();
@@ -72,9 +74,8 @@ public class BillUtil {
 	public static void generateXMLFiles(ArrayList<Pair> proxyPairs){
 		
 		int congCode = 111;
-		String billCode = "hr";
 
-		ArrayList<Pair> billNumberRanges = getValidRanges(congCode,billCode, proxyPairs);
+		ArrayList<Pair> billNumberRanges = getValidRanges(congCode,BillUtil.BILL_CODE, proxyPairs);
 		
 		ArrayBlockingQueue<Pair> rangeQueue = new ArrayBlockingQueue<Pair>(8000, false);
 		
@@ -83,8 +84,8 @@ public class BillUtil {
 			String start = p.getLeft();
 			String end = p.getRight();
 			
-			String startString = congCode + billCode + start;
-			String endString = congCode + billCode + end;
+			String startString = congCode + BillUtil.BILL_CODE + start;
+			String endString = congCode + BillUtil.BILL_CODE + end;
 
 			if(pathContainsFile(xml_filepath, startString) && pathContainsFile(xml_filepath, endString)){
 				System.out.println("Match! Removed range: " + p.toString());
@@ -98,7 +99,7 @@ public class BillUtil {
 		ArrayBlockingQueue<String> urlMoreQueue = new ArrayBlockingQueue<String> (8000, false);
 		ArrayBlockingQueue<String> xmlUrlQueue = new ArrayBlockingQueue<String>(8000, false);
 
-		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, urlMoreQueue, 111,"hr", "More<", true);
+		ListToUrlWorker writer0 = new ListToUrlWorker(proxyQueue, rangeQueue, urlMoreQueue, 111,BillUtil.BILL_CODE, "More<", true);
 		new Thread(writer0).start();
 		
 		MoreToXmlWorker[] moreToXmlWorkers = new MoreToXmlWorker[NUMBER_MORE_TO_XML_WORKERS];

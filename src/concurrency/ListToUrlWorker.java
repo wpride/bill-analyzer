@@ -19,7 +19,7 @@ public class ListToUrlWorker implements Runnable {
 	private boolean relative;
 
 	public ListToUrlWorker(BlockingQueue<Pair> proxyQ, BlockingQueue<Pair> rangeQ, BlockingQueue<String> urlQ,
-			int congressCode, String billCode, String key, boolean relative) { 
+			int congressCode, String billCode, String key, boolean relative) {
 		proxyQueue = proxyQ;
 		rangeQueue = rangeQ;
 		urlQueue = urlQ;
@@ -41,18 +41,21 @@ public class ListToUrlWorker implements Runnable {
 		}
 	}
 
-	void consume(Pair range) { 
+	void consume(Pair range) {
+		
 		try {
 			
-			String url = BillUtil.getBillPage(111, "hr", range.getLeft(), range.getRight());
+			String url = BillUtil.getBillPage(111, BillUtil.BILL_CODE, range.getLeft(), range.getRight());
 			
 			ArrayList<String> returnedURLs = BillUtil.getKeyRef(url, BillUtil.getProxyInputStream(url, mProxy), key, relative);
 			
-			System.out.println("ListToUrlWorker added " + returnedURLs.size() + " URLs with key: " + key);
-			try{
-				urlQueue.addAll(returnedURLs);
-			} catch (IllegalStateException e){
-				// filled up, fail quietly
+			for(String cur: returnedURLs){
+				
+				System.out.println("cur: " + cur);
+				
+				if(cur.contains("ih&")){
+					urlQueue.add(cur);
+				}
 			}
 			
 			if(true){
